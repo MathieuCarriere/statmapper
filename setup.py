@@ -1,14 +1,13 @@
-from setuptools       import setup, Extension
-from Cython.Build     import cythonize
-from Cython.Distutils import build_ext
+from distutils.core import setup
 
-perslocsig = Extension(name="statmapper",
-                       sources=["statmapper/perslocsig.pyx"],
-                       language="c++",
-                       extra_compile_args=["-Wmaybe-uninitialized", "-Wunused-but-set-variable", "-lboost_filesystem", "-std=c++11"])
-
-setup(name="statmapper",
-      author="Mathieu Carriere",
-      author_email="mathieu.carriere3@gmail.com",
-      ext_modules = cythonize([perslocsig]),
-      cmdclass = {"build_ext": build_ext})
+setup(
+    name                           = "statmapper",
+    author                         = "Mathieu Carriere",
+    author_email                   = "mathieu.carriere3@gmail.com",
+    packages                       = ["statmapper"],
+    description                    = "A set of functions for the statistical analysis of Mapper",
+    long_description_content_type  = "text/markdown",
+    long_description               = open("README.md", "r").read(),
+    url                            = "https://github.com/MathieuCarriere/statmapper/",
+    classifiers                    = ("Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Operating System :: OS Independent"),
+)
