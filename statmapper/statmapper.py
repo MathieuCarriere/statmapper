@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import ks_2samp
 from scipy.sparse.csgraph import dijkstra
+from scipy.sparse import csr_matrix
 from sklearn_tda import MapperComplex
 import gudhi as gd
 import struct
@@ -243,7 +244,7 @@ def print_to_dot(M, color_name="viridis", name_mapper="mapper", name_color="colo
 	fig.savefig("cbar_" + name_color + ".pdf", format="pdf")
 	plt.close()
 
-def compute_DE_features(X, M, nodes, out_feats=10, features=None):
+def compute_DE_features(X, M, nodes, out_feats=10, features=None, sparse=False):
 
 	node_info = M.node_info_
 	
@@ -251,10 +252,13 @@ def compute_DE_features(X, M, nodes, out_feats=10, features=None):
 
 	list_idxs1 = list(np.unique(np.concatenate([node_info[node_name]["indices"] for node_name in nodes])))
 	list_idxs2 = list(set(np.arange(X.shape[0]))-set(list_idxs1))
-	Xsub1, Xsub2 = X[list_idxs1, :], X[list_idxs2, :]
 	pvals = []
 	for f in features:
-		group1, group2 = Xsub1[:,f], Xsub2[:,f]
+		if sparse:
+			Xsp = csr_matrix(X)
+			group1, group2 = np.squeeze(np.array(Xsp[list_idxs1,f].todense())), np.squeeze(np.array(Xsp[list_idxs2,f].todense()))
+		else:
+			group1, group2 = X[list_idxs1,f], X[list_idxs2,f]
 		_,pval = ks_2samp(group1, group2)
 		pvals.append(pval)
 	pvals = np.array(pvals)
