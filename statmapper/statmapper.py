@@ -3,12 +3,14 @@ from scipy.stats import ks_2samp
 from scipy.sparse.csgraph import dijkstra
 from scipy.sparse import csr_matrix
 from sklearn_tda import MapperComplex
+import networkx as nx
 import gudhi as gd
 import struct
 import matplotlib
 import matplotlib.pyplot as plt
 import colorsys
 import os
+import sys
 
 def write_input_HomLoc(name, sc, vals):
 
@@ -209,6 +211,36 @@ def evaluate_significance(dgm, bnd, X, M, func, params, topo_type="loop", thresh
 	significant_idxs = [i for i in range(len(dgm)) if dgm[i][1][1]-dgm[i][1][0] >= 2*dist_thresh]	
 
 	return [dgm[i] for i in significant_idxs], [bnd[i] for i in significant_idxs]
+
+def mapper2networkx(mapper):
+	M = mapper.mapper_
+	G = nx.Graph()
+	for (splx,_) in M.get_skeleton(1):	
+		if len(splx) == 1:	G.add_node(splx[0])
+		if len(splx) == 2:	G.add_edge(splx[0], splx[1])
+	attrs = {k: {str(c): mapper.node_info_[k]["colors"][c] for c in range(len(mapper.node_info_[k]["colors"]))} for k in G.nodes()}
+	nx.set_node_attributes(G, attrs)
+	return G
+
+def compute_average(mapper_list, N=None, path_to_fgw="/home/mathieu/Documents/code/fgw/lib"):
+
+	if N is None:	N = int(np.mean(np.array([len(mapper.mapper_.get_skeleton(0)) for mapper in mapper_list])))
+
+	sys.path.append(path_to_fgw)
+	from FGW import fgw_barycenters
+	from graph import Graph, graph_colors, find_thresh, sp_to_adjency
+
+	graph_list    = [Graph(mapper2networkx(mapper)) for mapper in mapper_list]
+	Cs            = [x.distance_matrix(force_recompute=True, method="shortest_path") for x in graph_list]
+	ps            = [np.ones(len(x.nodes()))/len(x.nodes()) for x in graph_list]
+	Ys            = [[v for (k,v) in nx.get_node_attributes(x.nx_graph, "0").items()] for x in graph_list] #[x.values() for x in graph_list]
+	lambdas       = np.array([np.ones(len(Ys))/len(Ys)]).ravel()
+	init_X        = np.repeat(N,N)
+	D1, C1, log   = fgw_barycenters(N, Ys, Cs, ps, lambdas, alpha=0.95, init_X=init_X)
+	bary          = nx.from_numpy_matrix(sp_to_adjency(C1, threshinf=0, threshsup=find_thresh(C1, sup=100, step=100)[0]))
+	for i in range(len(D1)):	bary.add_node(i, attr_name=float(D1[i]))
+	nc = graph_colors(bary, vmin=-1, vmax=1)
+	return bary, nc
 
 def print_to_dot(M, color_name="viridis", name_mapper="mapper", name_color="color", epsv=.2, epss=.4):
 
