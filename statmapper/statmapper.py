@@ -210,14 +210,14 @@ def evaluate_significance(dgm, bnd, X, M, func, params, topo_type="loop", thresh
 
 	return [dgm[i] for i in significant_idxs], [bnd[i] for i in significant_idxs]
 
-def print_to_dot(M, color_name="viridis", name_mapper="mapper", name_color="color"):
+def print_to_dot(M, color_name="viridis", name_mapper="mapper", name_color="color", epsv=.2, epss=.4):
 
 	mapper = M.mapper_
 	node_info = M.node_info_
 
 	threshold = 0.
-	epsv, maxv, minv = .2, max([node_info[k]["colors"][0] for k in node_info.keys()]), min([node_info[k]["colors"][0] for k in node_info.keys()])
-	epss, maxs, mins = .4, max([node_info[k]["size"]      for k in node_info.keys()]), min([node_info[k]["size"]      for k in node_info.keys()])  
+	maxv, minv = max([node_info[k]["colors"][0] for k in node_info.keys()]), min([node_info[k]["colors"][0] for k in node_info.keys()])
+	maxs, mins = max([node_info[k]["size"]      for k in node_info.keys()]), min([node_info[k]["size"]      for k in node_info.keys()])  
 
 	f = open(name_mapper + "_" + name_color + ".dot", "w")
 	f.write("graph MAP{")
