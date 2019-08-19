@@ -257,7 +257,7 @@ def print_to_dot(M, color_name="viridis", name_mapper="mapper", name_color="colo
 	fig.savefig("cbar_" + name_color + ".pdf", format="pdf")
 	plt.close()
 
-def compute_DE_features(X, M, nodes, out_feats=10, features=None, sparse=False):
+def compute_DE_features(X, M, nodes, features=None, sparse=False):
 
 	node_info = M.node_info_
 	
@@ -276,5 +276,5 @@ def compute_DE_features(X, M, nodes, out_feats=10, features=None, sparse=False):
 		pvals.append(pval)
 	pvals = np.array(pvals)
 	
-	return features[np.argsort(pvals)[:out_feats]], np.sort(pvals)
+	return features[np.argsort(pvals)], np.sort(pvals)
 	
