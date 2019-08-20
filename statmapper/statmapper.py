@@ -87,12 +87,12 @@ def read_output_HomLoc(name, homology):
 
 
 
-def compute_topological_features(M, func, topo_type="loop", path_to_homology_localization="./HomologyLocalization"):
+def compute_topological_features(M, func, func_type="data", topo_type="loop", path_to_homology_localization="./HomologyLocalization"):
 
 	mapper = M.mapper_
 	node_info = M.node_info_
 	num_pts_mapper = len(node_info)
-	function = [np.mean([func[i] for i in node_info[v]["indices"]]) for v in range(num_pts_mapper)]
+	function = [np.mean([func[i] for i in node_info[v]["indices"]]) for v in range(num_pts_mapper)] if func_type == "data" else func
 
 	if topo_type == "downbranch" or topo_type == "upbranch":
 
