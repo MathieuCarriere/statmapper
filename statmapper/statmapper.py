@@ -1,9 +1,10 @@
 import numpy as np
 from scipy.stats import ks_2samp
-from scipy.sparse.csgraph import dijkstra, shortest_path
+from scipy.sparse.csgraph import dijkstra, shortest_path, connected_components
 from scipy.sparse import csr_matrix
 from sklearn_tda import MapperComplex
 import networkx as nx
+from networkx import cycle_basis
 import gudhi as gd
 import struct
 import matplotlib
@@ -12,87 +13,43 @@ import colorsys
 import os
 import sys
 
-def write_input_HomLoc(name, sc, vals):
-
-	dimension, num_pts = sc.dimension(), len(sc.get_skeleton(0))
-	pos = [0 for _ in range(num_pts)]
-
-	fout = open(name + ".dat", "wb")
-	fout.write(struct.pack("i", 2))
-	fout.write(struct.pack("i", dimension))
-	fout.write(struct.pack("i", num_pts))
-	fout.write(struct.pack("i", 1))
-	fout.write(struct.pack("d" * num_pts, *pos))
-	fout.write(struct.pack("d" * num_pts, *vals))
-	for dim in range(dimension+1):
-		list_splxs = [s for (s,_) in sc.get_skeleton(dim) if len(s) == dim+1]
-		fout.write(struct.pack("ii", dim, len(list_splxs)))
-		for spl in list_splxs:	
-			fout.write(struct.pack("i" * (dim+1), *spl))
-	fout.close()
-
-
-def read_output_HomLoc(name, homology):
-	
-	dgm = []
-	fdgm = open(name + ".dat.pers.txt", "r")
-	L = fdgm.readlines()
-
-	for line in L:
-		
-		if line == "\n":	continue
-		else: 
-			if line[0] == "[":	
-				homdim, num_pts = int(line[1]), int(line[-2])
-				continue
-			else:
-				lline = line[:-1].split("\t")
-				dgm.append((homdim, tuple([float(num) for num in lline])))
-		
-	bd, rd = [], []
-	fbnd = open(name + ".dat.bnd." + str(homdim+1), "r")
-	bnd = np.fromfile(fbnd, np.int16)
-	bnd = bnd[bnd>0].astype(np.int32)
-
-	if len(bnd) == 1:
-		bd.append([])
-	else:
-		ndim, ncyc = bnd[0], bnd[1]
-		b, cursor = [], 2
-		for _ in range(ncyc):
-			pts_in_cyc = bnd[cursor]
-			b.append(np.squeeze(np.reshape(bnd[cursor+1:cursor+pts_in_cyc*ndim+1], [pts_in_cyc, ndim])-1))
-			cursor += pts_in_cyc*ndim+1
-		bd.append(b)
-
-	fred = open(name + ".dat.red." + str(homdim+1), "r")
-	red = np.fromfile(fred, np.int16)
-	red = red[red>0].astype(np.int32)
-
-	if len(red) == 1:
-		rd.append([])
-	else:
-		ndim, ncyc = red[0], red[1]
-		r, cursor = [], 2
-		for _ in range(ncyc):
-			pts_in_cyc = red[cursor]
-			r.append(np.squeeze(np.reshape(red[cursor+1:cursor+pts_in_cyc*ndim+1], [pts_in_cyc, ndim])-1))
-			cursor += pts_in_cyc*ndim+1
-		rd.append(r)
-
-	return dgm, bd, rd
-
-
-
-
-
-
-def compute_topological_features(M, func, func_type="data", topo_type="loop", path_to_homology_localization="./HomologyLocalization"):
+def compute_topological_features(M, func=None, func_type="data", topo_type="downbranch"):
 
 	mapper = M.mapper_
 	node_info = M.node_info_
 	num_pts_mapper = len(node_info)
+
+	if func is None:
+		func_type = "graph"
+		# Compute inverse of eccentricity
+		A = np.zeros([num_pts_mapper, num_pts_mapper])
+		for (splx,_) in mapper.get_skeleton(1):
+			if len(splx) == 2:	
+				A[splx[0], splx[1]] = 1
+				A[splx[1], splx[0]] = 1
+		dij = dijkstra(A, directed=False)
+		D = np.where(np.isinf(dij), np.zeros(dij.shape), dij)
+		func = list(-D.max(axis=1))
+
 	function = [np.mean([func[i] for i in node_info[v]["indices"]]) for v in range(num_pts_mapper)] if func_type == "data" else func
+	dgm, bnd = [], []
+
+	if topo_type == "connected_components":
+		
+		num_pts = len(function)
+		A = np.zeros([num_pts, num_pts])
+		for (splx,_) in mapper.get_skeleton(1):
+			if len(splx) == 2:	
+				A[splx[0], splx[1]] = 1
+				A[splx[1], splx[0]] = 1
+
+		_, ccs = connected_components(A, directed=False)
+		
+		for ccID in np.unique(ccs):
+			pts = np.argwhere(ccs == ccID).flatten()
+			vals = [function[p] for p in pts]
+			dgm.append((0, (min(vals), max(vals))))
+			bnd.append(pts)
 
 	if topo_type == "downbranch" or topo_type == "upbranch":
 
@@ -118,7 +75,7 @@ def compute_topological_features(M, func, func_type="data", topo_type="loop", pa
 		inv_sorted_idxs = np.arange(num_pts)
 		for i in range(num_pts):	inv_sorted_idxs[sorted_idxs[i]] = i
 
-		diag, comp, parents = {}, {}, -np.ones(num_pts, dtype=np.int32)
+		diag, comp, parents, visited = {}, {}, -np.ones(num_pts, dtype=np.int32), {}
 		for i in range(num_pts):
 
 			current_pt = sorted_idxs[i]
@@ -140,48 +97,32 @@ def compute_topological_features(M, func, func_type="data", topo_type="loop", pa
 					val = max(function[pg], function[pn])
 					if pg != pn:
 						pp = pg if function[pg] > function[pn] else pn
-						comp[pp] = [v for v in np.arange(num_pts)[sorted_idxs[:i]] if find(v, parents) == pp]
+						comp[pp] = []
+						for v in np.arange(num_pts)[sorted_idxs[:i]]:
+							if find(v, parents) == pp:
+								try:	visited[v]
+								except KeyError:
+									visited[v] = True
+									comp[pp].append(v)
 						diag[pp] = current_pt
 						union(pg, pn, parents, function)
-		dgm, bnd = [], []
+		
 		for key, val in iter(diag.items()):
 			if topo_type == "downbranch":	dgm.append((0, (function[key],  function[val])))
 			elif topo_type == "upbranch":	dgm.append((0, (-function[val], -function[key])))
-			pts = comp[key]			
-			minI, maxI = np.argmin([function[p] for p in pts]), np.argmax([function[p] for p in pts])
-			subA = A[comp[key],:][:,comp[key]]
-			dists, preds = dijkstra(subA, return_predecessors=True)
-			init_pt = maxI
-			final_pts = [pts[init_pt]]
-			while init_pt is not minI:
-				init_pt = preds[minI, init_pt]
-				if init_pt == -9999:	break
-				final_pts.append(pts[init_pt])
-			bnd.append(final_pts)
+			bnd.append(comp[key])
 
 	elif topo_type == "loop":
 
-		sc = gd.SimplexTree()
-		maxf, num_pts = max(function), len(mapper.get_skeleton(0))
-		for (splx,f) in mapper.get_skeleton(1):	
-			sc.insert(splx)
-			sc.insert(splx + [num_pts])
-		func = function + [maxf+1.]
-
-		write_input_HomLoc("tmp", sc, func)
-		os.system(path_to_homology_localization + " -f tmp.dat")
-		_, bound, _ = read_output_HomLoc("tmp", 1)
-
-		dgm, bnd = [], []
-		for cycle in bound:
-			if cycle == []:	continue
-			cycle = np.squeeze(cycle)
-			bnd.append(cycle)
-			dgm.append((1,(min([function[v] for v in cycle]), max([function[v] for v in cycle]))))
+		G = mapper2networkx(M)
+		bnd = cycle_basis(G)
+		for pts in bnd:
+			vals = [function[p] for p in pts]
+			dgm.append((1,(min(vals), max(vals))))
 		
 	return dgm, bnd
 
-def evaluate_significance(dgm, bnd, X, M, func, params, topo_type="loop", threshold=.9, N=1000, input="point cloud", path_to_homology_localization="./HomologyLocalization"):
+def evaluate_significance(dgm, bnd, X, M, func, params, topo_type="loop", threshold=.9, N=1000, input="point cloud"):
 	
 	num_pts, distribution = len(X), []
 
@@ -197,7 +138,7 @@ def evaluate_significance(dgm, bnd, X, M, func, params, topo_type="loop", thresh
 		Mboot = MapperComplex(**params_boot).fit(Xboot)
 		
 		# Compute the corresponding persistence diagrams
-		dgm_boot, _ = compute_topological_features(Mboot, f_boot, topo_type=topo_type, path_to_homology_localization=path_to_homology_localization)
+		dgm_boot, _ = compute_topological_features(Mboot, func=f_boot, func_type="data", topo_type=topo_type)
 
 		# Compute the bottleneck distances between them and keep the maximum
 		npts, npts_boot = len(dgm), len(dgm_boot)
@@ -212,14 +153,15 @@ def evaluate_significance(dgm, bnd, X, M, func, params, topo_type="loop", thresh
 
 	return [dgm[i] for i in significant_idxs], [bnd[i] for i in significant_idxs]
 
-def mapper2networkx(mapper):
+def mapper2networkx(mapper, get_attrs=False):
 	M = mapper.mapper_
 	G = nx.Graph()
 	for (splx,_) in M.get_skeleton(1):	
 		if len(splx) == 1:	G.add_node(splx[0])
 		if len(splx) == 2:	G.add_edge(splx[0], splx[1])
-	attrs = {k: {"attr_name": mapper.node_info_[k]["colors"]} for k in G.nodes()}
-	nx.set_node_attributes(G, attrs)
+	if get_attrs:
+		attrs = {k: {"attr_name": mapper.node_info_[k]["colors"]} for k in G.nodes()}
+		nx.set_node_attributes(G, attrs)
 	return G
 
 

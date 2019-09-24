@@ -1,6 +1,9 @@
 from statmapper import compute_topological_features
+import sklearn_tda as sktda
 import gudhi as gd
 import os
+import numpy as np
+from scipy.sparse.csgraph import dijkstra
 
 mapper = gd.SimplexTree()
 mapper.insert([0,1])
@@ -15,7 +18,9 @@ mapper.insert([9,3])
 mapper.insert([7,10])
 mapper.insert([10,11])
 
-function = [0.,1.,2.,3.,4.,5.,2.,3.,4.,0.5,4.,5.]
+M = sktda.MapperComplex(filters=np.array([[0.]]), filter_bnds=np.array([[np.nan, np.nan]]), colors=np.array([[0.]]), resolutions=np.array([10]), gains=np.array([.3]))
+M.mapper_ = mapper
+M.node_info_ = {i: [] for i in range(12)}
 
 #	     5   11
 #	     |\  |
@@ -29,8 +34,11 @@ function = [0.,1.,2.,3.,4.,5.,2.,3.,4.,0.5,4.,5.]
 #	9    |
 #	     0
 
-dgm, bnd = compute_topological_features(mapper, function, "loop", "../../homloc/HomologyLocalization")
+dgm, bnd = compute_topological_features(M, topo_type="connected_components")
 print(dgm, bnd)
-if len(dgm) > 0:
-	plot = gd.plot_persistence_diagram(dgm)
-	plot.show()
+dgm, bnd = compute_topological_features(M, topo_type="downbranch")
+print(dgm, bnd)
+dgm, bnd = compute_topological_features(M, topo_type="upbranch")
+print(dgm, bnd)
+dgm, bnd = compute_topological_features(M, topo_type="loop")
+print(dgm, bnd)
