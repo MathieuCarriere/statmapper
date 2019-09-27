@@ -13,7 +13,7 @@ import colorsys
 import os
 import sys
 
-def compute_topological_features(M, func=None, func_type="data", topo_type="downbranch"):
+def compute_topological_features(M, func=None, func_type="data", topo_type="downbranch", threshold=0.):
 
 	mapper = M.mapper_
 	node_info = M.node_info_
@@ -97,14 +97,15 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 					val = max(function[pg], function[pn])
 					if pg != pn:
 						pp = pg if function[pg] > function[pn] else pn
-						comp[pp] = []
-						for v in np.arange(num_pts)[sorted_idxs[:i]]:
-							if find(v, parents) == pp:
-								try:	visited[v]
-								except KeyError:
-									visited[v] = True
-									comp[pp].append(v)
-						diag[pp] = current_pt
+						if np.abs(function[pp]-function[current_pt]) >= threshold:						
+							comp[pp] = []
+							for v in np.arange(num_pts)[sorted_idxs[:i]]:
+								if find(v, parents) == pp:
+									try:	visited[v]
+									except KeyError:
+										visited[v] = True
+										comp[pp].append(v)
+							diag[pp] = current_pt
 						union(pg, pn, parents, function)
 		
 		for key, val in iter(diag.items()):
