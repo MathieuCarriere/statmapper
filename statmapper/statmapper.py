@@ -61,7 +61,7 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 
 
 		def union(i, j, parents, f):
-			if f[i] < f[j]:	parents[j] = i
+			if f[i] <= f[j]:	parents[j] = i
 			else:	parents[i] = j
 
 		num_pts = len(function)
@@ -79,9 +79,10 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 		for i in range(num_pts):
 
 			current_pt = sorted_idxs[i]
-			neighbors = np.squeeze(np.argwhere(A[current_pt,:] == 1.))
-			lower_neighbors = [n for n in neighbors if inv_sorted_idxs[n] <= i] if len(neighbors.shape) > 0 else []
-
+			neighbors = np.argwhere(A[current_pt,:] == 1.)
+			if len(neighbors) == 1:	neighbors = neighbors[0,:]
+			else:	neighbors = np.squeeze(neighbors) 
+			lower_neighbors = [n for n in neighbors if inv_sorted_idxs[n] <= i] if neighbors.shape[0] > 0 else []
 			if lower_neighbors == []:
 	
 				parents[current_pt] = current_pt
@@ -107,6 +108,16 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 										comp[pp].append(v)
 							diag[pp] = current_pt
 						union(pg, pn, parents, function)
+					else:						
+						if len(neighbors) == len(lower_neighbors):
+							comp[pg] = []
+							for v in np.arange(num_pts)[sorted_idxs[:i+1]]:
+								if find(v, parents) == pg:
+									try:	visited[v]
+									except KeyError:
+										visited[v] = True
+										comp[pg].append(v)
+							diag[pg] = current_pt
 		
 		for key, val in iter(diag.items()):
 			if topo_type == "downbranch":	dgm.append((0, (function[key],  function[val])))
