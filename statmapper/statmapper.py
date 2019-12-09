@@ -14,7 +14,20 @@ import os
 import sys
 
 def compute_topological_features(M, func=None, func_type="data", topo_type="downbranch", threshold=0.):
+	"""
+	Compute the different topological structures associated to a Mapper graph (connected components, downward branches, upward branches, loops).
 
+	Parameters:
+		M (mapper graph): Mapper (as computed by sklearn_tda).
+		func (list): function used to compute the structures. It is either defined on the Mapper nodes (if func_type = "node") or on the input data (if func_type = "data"). If None, the function is computed with eccentricity.
+		func_type (string): type of function used to compute the structures. Either "node" or "data".
+		topo_type (string): type of topological structures. Either "connected_components", "downbranch", "upbranch" or "loop".
+		threshold (float): threshold on the topological structure types. Structures of size less than this value are ignored.
+
+	Returns:
+		dgm (list of tuple (dimension, (vb, vd))): list containing the dimension and the coordinates of each topological structure.
+		bnd (list of list of int): data points corresponding to each topological structure.
+	"""
 	mapper = M.mapper_
 	node_info = M.node_info_
 	num_pts_mapper = len(node_info)
@@ -135,7 +148,25 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 	return dgm, bnd
 
 def evaluate_significance(dgm, bnd, X, M, func, params, topo_type="loop", threshold=.9, N=1000, input="point cloud"):
-	
+	"""
+	Evaluate the statistical significance of each topological structure of a Mapper graph with bootstrap.
+
+	Parameters:
+		dgm (list of tuple (dimension, (vb, vd))): list containing the dimension and the coordinates of each topological structure.
+		bnd (list of list of int): data points corresponding to each topological structure.
+		X (numpy array of shape n x d if point cloud and n x n if distance matrix): input point cloud or distance matrix.
+		M (mapper graph): Mapper (as computed by sklearn_tda).
+		func (list): function used to compute the structures. It is either defined on the Mapper nodes (if func_type = "node") or on the input data (if func_type = "data"). If None, the function is computed with eccentricity.
+		params (dictionary): parameters used to compute the original Mapper.
+		topo_type (string): type of topological structure. Either "connected_components", "downbranch", "upbranch" or "loop".
+		threshold (float): threshold on the statistical significance.
+		N (int): number of bootstrap iterations.
+		input (string): type of input data. Either "point cloud" or "distance matrix".
+
+	Returns:
+		dgmboot (list of tuple (dimension, (vb, vd))): subset of dgm with statistical significance above threshold.
+		bndboot (list of list of int): subset of bnd with statistical significance above threshold.
+	"""
 	num_pts, distribution = len(X), []
 
 	for bootstrap_id in range(N):
@@ -162,10 +193,20 @@ def evaluate_significance(dgm, bnd, X, M, func, params, topo_type="loop", thresh
 	distribution = np.sort(distribution)
 	dist_thresh  = distribution[int(threshold*len(distribution))]
 	significant_idxs = [i for i in range(len(dgm)) if dgm[i][1][1]-dgm[i][1][0] >= 2*dist_thresh]	
-
-	return [dgm[i] for i in significant_idxs], [bnd[i] for i in significant_idxs]
+	dgmboot, bndboot = [dgm[i] for i in significant_idxs], [bnd[i] for i in significant_idxs] 
+	return dgmboot, bndboot
 
 def mapper2networkx(mapper, get_attrs=False):
+	"""
+	Turn a Mapper graph (as computed by sklearn_tda) into a networkx graph.
+
+	Parameters:
+		mapper (mapper graph): Mapper (as computed by sklearn_tda).
+		get_attrs (bool): whether to use Mapper attributes or not.
+
+	Returns:
+		G (networkx graph): networkx graph associated to the Mapper.
+	"""
 	M = mapper.mapper_
 	G = nx.Graph()
 	for (splx,_) in M.get_skeleton(1):	
@@ -178,7 +219,17 @@ def mapper2networkx(mapper, get_attrs=False):
 
 
 def print_to_dot(M, color_name="viridis", name_mapper="mapper", name_color="color", epsv=.2, epss=.4):
+	"""
+	Produce a pdf file with a drawing of the Mapper.
 
+	Parameters:
+		M (mapper graph): Mapper (as computed by sklearn_tda).
+		color_name (string): color map to use for the Mapper nodes.
+		name_mapper (string): name of the pdf file.
+		name_color (string): name of the color used to color the Mapper nodes.
+		epsv (float): minimum of the color map.
+		epss (float): maximum of the color map.
+	"""
 	mapper = M.mapper_
 	node_info = M.node_info_
 
@@ -212,7 +263,20 @@ def print_to_dot(M, color_name="viridis", name_mapper="mapper", name_color="colo
 	plt.close()
 
 def compute_DE_features(X, M, nodes, features=None, sparse=False):
+	"""
+	Compute the differentially expressed features corresponding to some topological structures of a Mapper graph.
 
+	Parameters:
+		X (numpy array of shape n x d): input point cloud.
+		M (mapper graph): Mapper (as computed by sklearn_tda).
+		nodes (list of string): nodes of the Mapper belonging to the topological structure on which DE features are to be computed.
+		features (list of int): indices of the features to test for differential accessibility.
+		sparse (bool): whether to use sparse representation of the point cloud or not.
+
+	Returns:
+		F (array of int): indices of the DE features.
+		P (array of float): p-values corresponding to the DE features.
+	"""
 	node_info = M.node_info_
 	
 	if features is None:	features = np.arange(X.shape[1])
@@ -229,6 +293,6 @@ def compute_DE_features(X, M, nodes, features=None, sparse=False):
 		_,pval = ks_2samp(group1, group2)
 		pvals.append(pval)
 	pvals = np.array(pvals)
-	
-	return features[np.argsort(pvals)], np.sort(pvals)
+	F, P = features[np.argsort(pvals)], np.sort(pvals) 
+	return F, P
 	
