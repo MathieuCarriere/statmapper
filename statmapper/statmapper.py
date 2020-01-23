@@ -119,6 +119,7 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 									except KeyError:
 										visited[v] = True
 										comp[pp].append(v)
+							comp[pp].append(current_pt)
 							diag[pp] = current_pt
 						union(pg, pn, parents, function)
 					else:						
@@ -130,6 +131,7 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 									except KeyError:
 										visited[v] = True
 										comp[pg].append(v)
+							comp[pg].append(current_pt)
 							diag[pg] = current_pt
 		
 		for key, val in iter(diag.items()):
