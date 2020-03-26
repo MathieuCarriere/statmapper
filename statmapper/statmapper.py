@@ -61,8 +61,9 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 		for ccID in np.unique(ccs):
 			pts = np.argwhere(ccs == ccID).flatten()
 			vals = [function[p] for p in pts]
-			if np.abs(min(vals) - max(vals)) >= threshold:	dgm.append((0, (min(vals), max(vals))))
-			bnd.append(pts)
+			if np.abs(min(vals) - max(vals)) >= threshold:
+				dgm.append((0, (min(vals), max(vals))))
+				bnd.append(pts)
 
 	if topo_type == "downbranch" or topo_type == "upbranch":
 
@@ -141,10 +142,12 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 	elif topo_type == "loop":
 
 		G = mapper2networkx(M)
-		bnd = cycle_basis(G)
-		for pts in bnd:
+		bndall = cycle_basis(G)
+		for pts in bndall:
 			vals = [function[p] for p in pts]
-			if np.abs(min(vals) - max(vals)) >= threshold:	dgm.append((1,(min(vals), max(vals))))
+			if np.abs(min(vals) - max(vals)) >= threshold:	
+				dgm.append((1,(min(vals), max(vals))))
+				bnd.append(pts)
 		
 	return dgm, bnd
 
