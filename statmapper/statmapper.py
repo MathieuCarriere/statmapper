@@ -61,7 +61,7 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 		for ccID in np.unique(ccs):
 			pts = np.argwhere(ccs == ccID).flatten()
 			vals = [function[p] for p in pts]
-			dgm.append((0, (min(vals), max(vals))))
+			if np.abs(min(vals) - max(vals)) >= threshold:	dgm.append((0, (min(vals), max(vals))))
 			bnd.append(pts)
 
 	if topo_type == "downbranch" or topo_type == "upbranch":
@@ -110,17 +110,16 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 					pn = find(neighbor, parents)
 					val = max(function[pg], function[pn])
 					if pg != pn:
-						pp = pg if function[pg] > function[pn] else pn
-						if np.abs(function[pp]-function[current_pt]) >= threshold:						
-							comp[pp] = []
-							for v in np.arange(num_pts)[sorted_idxs[:i]]:
-								if find(v, parents) == pp:
-									try:	visited[v]
-									except KeyError:
-										visited[v] = True
-										comp[pp].append(v)
-							comp[pp].append(current_pt)
-							diag[pp] = current_pt
+						pp = pg if function[pg] > function[pn] else pn						
+						comp[pp] = []
+						for v in np.arange(num_pts)[sorted_idxs[:i]]:
+							if find(v, parents) == pp:
+								try:	visited[v]
+								except KeyError:
+									visited[v] = True
+									comp[pp].append(v)
+						comp[pp].append(current_pt)
+						if np.abs(function[pp]-function[current_pt]) >= threshold:	diag[pp] = current_pt
 						union(pg, pn, parents, function)
 					else:						
 						if len(neighbors) == len(lower_neighbors):
@@ -132,7 +131,7 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 										visited[v] = True
 										comp[pg].append(v)
 							comp[pg].append(current_pt)
-							diag[pg] = current_pt
+							if np.abs(function[pg]-function[current_pt]) >= threshold:	diag[pg] = current_pt
 		
 		for key, val in iter(diag.items()):
 			if topo_type == "downbranch":	dgm.append((0, (function[key],  function[val])))
@@ -145,7 +144,7 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 		bnd = cycle_basis(G)
 		for pts in bnd:
 			vals = [function[p] for p in pts]
-			dgm.append((1,(min(vals), max(vals))))
+			if np.abs(min(vals) - max(vals)) >= threshold:	dgm.append((1,(min(vals), max(vals))))
 		
 	return dgm, bnd
 
