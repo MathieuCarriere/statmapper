@@ -33,7 +33,7 @@ def compute_topological_features(M, func=None, func_type="data", topo_type="down
 	num_pts_mapper = len(node_info)
 
 	if func is None:
-		func_type = "graph"
+		func_type = "node"
 		# Compute inverse of eccentricity
 		A = np.zeros([num_pts_mapper, num_pts_mapper])
 		for (splx,_) in mapper.get_skeleton(1):
