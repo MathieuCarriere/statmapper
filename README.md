@@ -1,5 +1,7 @@
 # statmapper
 
+**Warning**: this code is no longer maintained as it is now part of the Gudhi library. See https://gudhi.inria.fr/python/latest/cover_complex_sklearn_isk_ref.html and https://github.com/GUDHI/TDA-tutorial/blob/master/Tuto-GUDHI-cover-complex.ipynb.
+
 This package provides code for various statistics to be run on the Mapper. Install with:
 
 
